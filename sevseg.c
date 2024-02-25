@@ -19,7 +19,7 @@
 #define SELECT_ARRAY_SIZE  3
 #define SELECT_MAP_SIZE    6
 
-#define NUM_ELEMENTS_DEF   6
+#define NUM_ELEMENTS_DEF   1
 #define REFRESH_PERIOD_DEF 3
 
 #define MS_TO_NS(x)        (x * 1000000L)
@@ -28,10 +28,10 @@ static struct gpio_descs * select_pins_array;
 
 static unsigned char map_select_pins[SELECT_MAP_SIZE][SELECT_ARRAY_SIZE] = {
 	  {0, 0, 0}
-	, {1, 0, 0}
-	, {0, 1, 0}
-	, {1, 1, 0}
 	, {0, 0, 1}
+	, {0, 1, 0}
+	, {0, 1, 1}
+	, {1, 0, 0}
 	, {1, 0, 1}
 };
 
@@ -148,7 +148,10 @@ static ssize_t set_period_callback(struct device *dev,
 	if (period > 0)
 		refresh_period = ktime_set(0, MS_TO_NS(period));
 	else
+	{
 		refresh_period = ktime_set(0, MS_TO_NS(REFRESH_PERIOD_DEF));
+		printk("set_period_callback: Invalid timer period: %ld. Setting the default value.", period);
+	}
 
 	timer_time = hrtimer_cb_get_time(&refresh_timer);
 	hrtimer_forward(&refresh_timer, timer_time, refresh_period);
@@ -188,7 +191,8 @@ static int sevseg_remove(struct platform_device *pdev);
 static struct of_device_id sevseg_of_match[] = {
 	{
 		.compatible = SEVSEG_DRV_NAME,
-	}, { /* sentinel */ }
+	},
+	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, sevseg_of_match);
 
@@ -223,29 +227,62 @@ static struct device *s_pDevObject;
 static int sevseg_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	unsigned int tmp_refresh_period;
 
 	printk("sevseg_probe: BEGIN\n");
 	
-	if(!device_property_present(dev, "segment-gpios")) {
-		printk("sevseg_probe - Error! Device property 'segment-gpios' not found!\n");
+	if (!device_property_present(dev, "segment-pins-gpios")) {
+		printk("sevseg_probe - Error! Device property 'segment-pins-gpios' not found!\n");
 		return -1;
 	}
 
-	if(!device_property_present(dev, "select-gpios")) {
-		printk("sevseg_probe - Error! Device property 'select-gpios' not found!\n");
+	if (!device_property_present(dev, "select-pins-gpios")) {
+		printk("sevseg_probe - Error! Device property 'select-pins-gpios' not found!\n");
 		return -1;
 	}
 
-	seg_pins_array = gpiod_get_array(dev, "segment", GPIOD_OUT_HIGH);
-	if(IS_ERR(seg_pins_array)) {
+	if (!device_property_present(dev, "sevseg-number")) {
+		printk("sevseg_probe - Error! Device property 'sevseg-number' not found!\n");
+		return -1;
+	}
+
+	if (!device_property_present(dev, "refresh-period")) {
+		printk("sevseg_probe - Error! Device property 'refresh-period' not found!\n");
+		return -1;
+	}
+
+	if (!device_property_present(dev, "sevseg-elements")) {
+		printk("sevseg_probe - Error! Device property 'sevseg-elements' not found!\n");
+		return -1;
+	}
+
+	seg_pins_array = gpiod_get_array(dev, "segment-pins", GPIOD_OUT_HIGH);
+	if (IS_ERR(seg_pins_array)) {
 		printk("sevseg_probe - Error! Could not setup the GPIO\n");
 		return -1 * IS_ERR(seg_pins_array);
 	}
 
-	select_pins_array = gpiod_get_array(dev, "select", GPIOD_OUT_HIGH);
+	select_pins_array = gpiod_get_array(dev, "select-pins", GPIOD_OUT_HIGH);
 	if(IS_ERR(select_pins_array)) {
 		printk("sevseg_probe - Error! Could not setup the GPIO\n");
 		return -1 * IS_ERR(select_pins_array);
+	}
+
+	// TODO fix the sevseg_number type (U64 or U32)
+	if (device_property_read_u32(dev, "sevseg-number", (unsigned int *)&sevseg_number)) {
+		printk("sevseg_probe - Error! Could not read 'sevseg-number'\n");
+		return -1;
+	}
+
+	if (device_property_read_u32(dev, "refresh-period", &tmp_refresh_period)) {
+		printk("sevseg_probe - Error! Could not read 'refresh-period'\n");
+		return -1;
+	}
+
+	// TODO fix the nb_of_elements type (U8)
+	if (device_property_read_u32(dev, "sevseg-elements", (unsigned int *)&nb_of_elements)) {
+		printk("sevseg_probe - Error! Could not read 'sevseg-elements'\n");
+		return -1;
 	}
 
 	s_pDeviceClass = class_create(THIS_MODULE, SEVSEG_DRV_NAME);
@@ -266,7 +303,7 @@ static int sevseg_probe(struct platform_device *pdev)
 		goto err_device_create;
 	}
 
-	refresh_period = ktime_set(0, MS_TO_NS(REFRESH_PERIOD_DEF));
+	refresh_period = ktime_set(0, MS_TO_NS(tmp_refresh_period));
 	hrtimer_init(&refresh_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	refresh_timer.function = &refresh_timer_handler;
 	hrtimer_start(&refresh_timer, refresh_period, HRTIMER_MODE_REL);
