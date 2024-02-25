@@ -10,18 +10,24 @@
 			sevseg_device {
 				compatible = "sevseg";
 				status = "okay";
-				select-gpios =	<&gpio 23 0>,
-								<&gpio 24 0>,
-								<&gpio 25 0>;
+				// TODO add a description
+				select-pins-gpios =	<&gpio 25 0>,
+									<&gpio 24 0>,
+									<&gpio 23 0>;
 
-				segment-gpios =	<&gpio 17 0>,
-								<&gpio 27 0>,
-								<&gpio 22 0>,
-								<&gpio 13 0>,
-								<&gpio 19 0>,
-								<&gpio 26 0>,
-								<&gpio 20 0>,
-								<&gpio 21 0>; 
+				// TODO add a description
+				segment-pins-gpios =	<&gpio 17 0>,
+										<&gpio 27 0>,
+										<&gpio 22 0>,
+										<&gpio 13 0>,
+										<&gpio 19 0>,
+										<&gpio 26 0>,
+										<&gpio 20 0>,
+										<&gpio 21 0>;
+
+				sevseg-number = <987654>;
+				refresh-period = <500>;
+				sevseg-elements = <6>;
 			};
 		};
 	};
