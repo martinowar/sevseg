@@ -285,6 +285,8 @@ static int sevseg_probe(struct platform_device *pdev)
 		return -1;
 	}
 
+	active_element = nb_of_elements - 1;
+
 	s_pDeviceClass = class_create(THIS_MODULE, SEVSEG_DRV_NAME);
 	if (s_pDeviceClass == NULL) {
 		printk("sevseg_probe: cannot create class");
@@ -344,8 +346,6 @@ int sevseg_init(void)
 	int result;
 
 	printk("sevseg_init: driver initialization...");
-
-	active_element = nb_of_elements - 1;
 
 	result = platform_driver_register(&sevseg_driver);
 	if (result) {
